@@ -418,6 +418,16 @@ export async function readCronRunLogEntriesPageAll(
     };
   }
   await Promise.all(jsonlFiles.map((f) => drainPendingWrite(f)));
+  // Defensive prune before reading — same pattern as readCronRunLogEntriesPage.
+  // Especially important here since we fan out over ALL job files concurrently.
+  await Promise.all(
+    jsonlFiles.map((f) =>
+      pruneIfNeeded(f, {
+        maxBytes: DEFAULT_CRON_RUN_LOG_MAX_BYTES,
+        keepLines: DEFAULT_CRON_RUN_LOG_KEEP_LINES,
+      }).catch(() => undefined),
+    ),
+  );
   const chunks = await Promise.all(
     jsonlFiles.map(async (filePath) => {
       const raw = await fs.readFile(filePath, "utf-8").catch(() => "");
